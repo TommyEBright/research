@@ -77,13 +77,23 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .note{font-size:12px;color:var(--ink2)}
 #modal{position:fixed;inset:0;background:rgba(14,22,34,.4);display:none;align-items:flex-start;justify-content:center;z-index:20;overflow:auto;padding:30px 12px}
 #modal.open{display:flex}
-#modal .box{background:#fff;border-radius:8px;max-width:780px;width:100%;padding:20px 22px}
+#modal .box{background:#fff;border-radius:8px;max-width:920px;width:100%;padding:20px 22px}
 #modal fieldset{border:1px solid var(--line);border-radius:6px;margin:0 0 12px;padding:8px 14px 10px}
 #modal legend{font-weight:650;padding:0 4px;color:var(--navy)}
 .set{display:grid;grid-template-columns:1fr 170px;gap:4px 12px;align-items:center;padding:4px 0}
 .set small{grid-column:1/-1;color:var(--muted);margin-top:-3px}
 .set input,.set select{width:100%}
 #resPlot{height:260px;margin-top:8px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:7px 12px;color:var(--ink2)}
+.tabs button.on{border-bottom-color:var(--navy);color:var(--navy);font-weight:600}
+.mtab{margin-top:6px}
+.mtab td,.mtab th{padding:4px 9px}
+.mtab tr.g td{background:#f8f9fb;color:var(--navy);font-weight:650;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:8px}
+.mtab td.v{text-align:right;font-variant-numeric:tabular-nums}
+.mtab td.v .u{color:var(--muted);margin-left:4px}
+#customTable td{padding:3px 4px;border:0}
+#customTable input,#customTable select{width:100%}
 textarea{width:100%;font:12px ui-monospace,Menlo,Consolas,monospace;border:1px solid var(--line);border-radius:5px;padding:6px}
 .cite{background:#f8f9fb;border:1px solid var(--line);border-radius:5px;padding:10px 12px;font-size:13px;margin:6px 0}
 .cite pre{margin:0;white-space:pre-wrap;font:12px ui-monospace,Menlo,Consolas,monospace}
@@ -140,17 +150,17 @@ footer{max-width:1500px;margin:0 auto;padding:0 24px 30px;font-size:12px;color:v
       </div>
       <div class="legend">
         <span><i style="background:rgba(120,120,115,.18)"></i>Quiet stance</span>
-        <span><i style="background:rgba(42,120,214,.2)"></i>Unweighting</span>
-        <span><i style="background:rgba(235,104,52,.2)"></i>Above weight</span>
-        <span><i style="background:rgba(237,161,0,.28)"></i>Pre-take-off</span>
+        <span><i style="background:rgba(42,120,214,.2)"></i>Unweighting phase</span>
+        <span><i style="background:rgba(235,104,52,.2)"></i>Active phase</span>
+        <span><i style="background:rgba(237,161,0,.28)"></i>Pre-take-off deceleration phase</span>
         <span><i style="background:rgba(160,160,155,.22)"></i>Flight</span>
-        <span><i style="background:rgba(27,175,122,.22)"></i>Landing loading</span>
+        <span><i style="background:rgba(27,175,122,.22)"></i>Landing loading phase</span>
         <span><i style="background:none;border-top:2px dashed #555;height:0;border-radius:0"></i>Reference weight</span>
       </div>
       <div id="plot"></div>
       <div class="events" id="events"></div>
       <div id="flags"></div>
-      <div class="mgrid" id="metrics"></div>
+      <div id="metrics"></div>
     </div>
   </div>
 </section>
@@ -179,48 +189,77 @@ footer{max-width:1500px;margin:0 auto;padding:0 24px 30px;font-size:12px;color:v
 
 <div id="modal"><div class="box">
   <div class="row" style="margin-bottom:10px"><h2 style="margin:0;font-size:16px">Settings</h2><span class="sp" style="flex:1"></span><button id="closeSettings">Close</button></div>
+  <div class="tabs"><button data-tab="det" class="on">Detection and processing</button><button data-tab="calc">Calculations</button><button data-tab="io">Save / load</button></div>
+  <div id="tab-det">
   <div id="setForm"></div>
   <fieldset><legend>Residual analysis</legend>
     <div class="note">Runs on the raw force of every loaded trial using the residual settings above. The result only fills in the cut-off field; it is applied when you press Apply.</div>
     <div class="row" style="margin-top:6px"><button id="runRes">Run residual analysis</button><button id="useRes" disabled>Use suggested cut-off</button><span id="resOut" class="note"></span></div>
     <div id="resPlot"></div>
   </fieldset>
+  </div>
+  <div id="tab-calc" hidden>
+  <div id="calcForm"></div>
+  <fieldset><legend>Custom metrics</legend>
+    <div class="note">Each custom metric applies one statistic to the force between two detected events, with an optional time offset on each (e.g. impulse from onset to onset + 0.100 s). Custom metrics appear in the trial view and the CSV, are reported in absolute and relative terms where meaningful, and are saved with the settings.</div>
+    <div class="tablewrap" style="margin-top:8px;max-height:none"><table id="customTable"><thead><tr><th>Name</th><th>Statistic</th><th>From</th><th>Offset (s)</th><th>To</th><th>Offset (s)</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div class="row" style="margin-top:6px"><button id="addCustom">Add metric</button></div>
+  </fieldset>
+  </div>
+  <div id="tab-io" hidden>
   <fieldset><legend>Save / load settings</legend>
     <textarea id="setJson" rows="4" placeholder="Paste settings JSON here and press Load"></textarea>
     <div class="row" style="margin-top:6px"><button id="copySet">Copy current</button><button id="loadSet">Load pasted</button><button id="resetSet">Reset to defaults</button></div>
+    <div class="note" style="margin-top:6px">Settings include the custom metrics. Share the JSON with collaborators so everyone runs the same analysis.</div>
   </fieldset>
+  </div>
   <div class="row"><button class="primary" id="applySet">Apply</button><span class="note">Applying new settings recalculates every trial and resets any skipped events.</span></div>
 </div></div>
 <div id="toast"></div>
 
 <script>
-// Band CMJ Analysis - analysis core (no DOM)
-const VERSION = '1.1.0';
+// Force-Time Analysis - analysis core (no DOM). Times in seconds, forces in newtons.
+const VERSION = '1.2.0';
 
 const DEFAULTS = {
   phaseRef: 'trial',      // 'trial' = trial's own standing weight, 'normal' = body weight from normal trial
   onsetRef: 'trial',      // weight used to detect movement onset
-  quietLen: 300,          // ms, quiet stance window length
-  quietSearch: 600,       // ms, window must end within this time from record start
+  quietLen: 0.3,          // s, quiet stance window length
+  quietSearch: 0.6,       // s, window must end within this time from record start
+  sdFlag: 10,             // N, flag quiet stance SD above this
   onsetSD: 5,             // onset threshold, multiples of quiet stance SD
   onsetMinN: 0,           // N, minimum onset threshold
   onsetDir: 'below',      // 'below' or 'either'
-  onsetBack: 30,          // ms, step back from threshold crossing
+  onsetBack: 0.03,        // s, step back from threshold crossing
+  eventMode: 'fixed',     // 'fixed' thresholds or 'flight' = flight-phase mean + k SD
   takeoffN: 20,           // N
   landingN: 20,           // N
-  minFlight: 100,         // ms
-  minContact: 10,         // ms, contact must persist this long before take-off and after landing
-  landWin: 300,           // ms, landing peak search window
-  slopeWin: 20,           // ms, window for rate of force change
-  filterOn: false,
-  filterHz: 50,           // Hz, low-pass cut-off (2nd order Butterworth, dual pass)
-  g: 9.81,
-  sdFlag: 10,             // N, flag quiet stance SD above this
-  postLandFlag: 1000,     // ms, flag recordings ending sooner than this after landing
-  eventMode: 'fixed',     // 'fixed' thresholds or 'flight' = flight-phase mean + k SD
   flightK: 5,             // SD multiple for flight-based thresholds
   flightMid: 50,          // %, central portion of flight used for noise
-  resMin: 1, resMax: 250, resStep: 1, resFitLo: 150, resFitHi: 250 // Hz, residual analysis
+  minFlight: 0.1,         // s
+  minContact: 0.01,       // s, contact must persist this long before take-off and after landing
+  postLandFlag: 1,        // s, flag recordings ending sooner than this after landing
+  filterOn: false,
+  filterHz: 50,           // Hz, low-pass cut-off
+  filterCorrect: false,   // Winter's correction of the design cut-off for the dual pass
+  resMin: 1, resMax: 250, resStep: 1, resFitLo: 150, resFitHi: 250, // Hz, residual analysis
+  intMethod: 'trapz',     // 'trapz', 'rect' or 'simpson'
+  avgRFDDef: 'minPeak',   // 'minPeak' or 'activePeak'
+  slopeWin: 0.02,         // s, window for rate of force change
+  landWin: 0.3,           // s, landing peak search window
+  g: 9.81,
+  custom: []              // [{name, stat, from, fromOff, to, toOff}]
+};
+
+const EVENTS = {
+  onset: 'Movement onset', min: 'Minimum force (unweighting)', active: 'Start of active phase', peak: 'Peak force',
+  decel: 'Start of pre-take-off deceleration phase', takeoff: 'Take-off', landing: 'Landing', landPeak: 'Peak landing force'
+};
+const STATS = {
+  mean: ['Mean force', 'force'], peak: ['Peak force', 'force'], min: ['Minimum force', 'force'],
+  impRef: ['Impulse relative to reference weight', 'impulse'], impAbs: ['Impulse of absolute force', 'impulse'],
+  dur: ['Duration', 'time'], ttp: ['Time to peak force', 'time'],
+  avgRFD: ['Average rate of force change', 'rate'], peakRFD: ['Peak RFD', 'rate'], minRFD: ['Peak rate of force decrease', 'rate']
 };
 
 function parseKinvent(text) {
@@ -276,8 +315,9 @@ function lowpass(x, fc, fs) {
   return pass(pass(pad).reverse()).reverse().slice(p, p + x.length);
 }
 
+
 function quietStance(F, fs, s) {
-  const len = Math.round(s.quietLen * fs / 1000), lim = Math.round(s.quietSearch * fs / 1000), step = Math.max(1, Math.round(fs / 100));
+  const len = Math.round(s.quietLen * fs), lim = Math.round(s.quietSearch * fs), step = Math.max(1, Math.round(fs / 100));
   let best = null;
   for (let a = 0; a + len <= Math.max(lim, len) && a + len <= F.length; a += step) {
     let m = 0; for (let i = a; i < a + len; i++) m += F[i]; m /= len;
@@ -288,7 +328,19 @@ function quietStance(F, fs, s) {
   return best;
 }
 
-const trapz = (F, a, b, ref, dt) => { let s = 0; for (let i = a; i < b; i++) s += (F[i] + F[i + 1]) / 2 - ref; return s * dt; };
+// integral of (F - ref) from sample a to b
+function integ(F, a, b, ref, dt, method) {
+  if (b <= a) return 0;
+  const g = i => F[i] - ref;
+  if (method === 'rect') { let s = 0; for (let i = a; i < b; i++) s += g(i); return s * dt; }
+  const trap = (p, q) => { let s = 0; for (let i = p; i < q; i++) s += (g(i) + g(i + 1)) / 2; return s * dt; };
+  if (method !== 'simpson' || b - a < 2) return trap(a, b);
+  const n = b - a, m = n % 2 ? n - 1 : n;
+  let s = g(a) + g(a + m);
+  for (let i = 1; i < m; i++) s += (i % 2 ? 4 : 2) * g(a + i);
+  return s * dt / 3 + (m < n ? trap(a + m, b) : 0);
+}
+
 function slopeExtreme(F, a, b, w, fs, max) {
   let best = null;
   for (let i = a; i + w <= b; i++) {
@@ -298,18 +350,38 @@ function slopeExtreme(F, a, b, w, fs, max) {
   return best;
 }
 
-// trial: {F (raw), condition}; ctx: {bw (N) from normal trials or null}; skips: {onset, takeoff, landing}
+function customMetric(F, fs, ev, c, Wref, s) {
+  if (ev[c.from] == null || ev[c.to] == null) return null;
+  const a = Math.max(0, ev[c.from] + Math.round((+c.fromOff || 0) * fs)), b = Math.min(F.length - 1, ev[c.to] + Math.round((+c.toOff || 0) * fs));
+  if (b <= a) return null;
+  const w = Math.max(1, Math.round(s.slopeWin * fs));
+  let mx = a, mn = a, sum = 0;
+  for (let i = a; i <= b; i++) { if (F[i] > F[mx]) mx = i; if (F[i] < F[mn]) mn = i; sum += F[i]; }
+  switch (c.stat) {
+    case 'mean': return sum / (b - a + 1);
+    case 'peak': return F[mx];
+    case 'min': return F[mn];
+    case 'impRef': return integ(F, a, b, Wref, 1 / fs, s.intMethod);
+    case 'impAbs': return integ(F, a, b, 0, 1 / fs, s.intMethod);
+    case 'dur': return (b - a) / fs;
+    case 'ttp': return (mx - a) / fs;
+    case 'avgRFD': return (F[b] - F[a]) * fs / (b - a);
+    case 'peakRFD': return slopeExtreme(F, a, b, w, fs, true);
+    case 'minRFD': return slopeExtreme(F, a, b, w, fs, false);
+  }
+  return null;
+}
+
+// raw: force (N); bwN: body weight from normal trials (N) or null; skips: {onset, takeoff, landing}
 function analyseTrial(raw, fs, condition, bwN, skips, s) {
-  const F = s.filterOn ? lowpass(raw, s.filterHz, fs) : raw.slice();
-  const dt = 1 / fs, ms = i => i * 1000 / fs, n = F.length;
+  const F = s.filterOn ? lowpass(raw, s.filterCorrect ? s.filterHz / 0.802 : s.filterHz, fs) : raw.slice();
+  const dt = 1 / fs, sec = i => i / fs, n = F.length;
   const flags = [], ev = {}, m = {};
   const q = quietStance(F, fs, s);
   const out = { F, flags, ev, m, quiet: q, cand: {} };
   if (!q) { flags.push('Recording too short for quiet stance window'); return out; }
   m.standing = q.mean; m.quietSD = q.sd;
   if (q.sd > s.sdFlag) flags.push(`Noisy quiet stance (SD ${q.sd.toFixed(1)} N)`);
-  const bm = bwN ? bwN / s.g : null;
-  m.bodyMass = bm;
   if (bwN) {
     m.bandOffset = q.mean - bwN;
     if (condition === 'Assisted' && q.mean >= bwN) flags.push('Standing force not below body weight - check condition label');
@@ -321,7 +393,7 @@ function analyseTrial(raw, fs, condition, bwN, skips, s) {
   m.refWeight = Wref;
 
   // take-off and landing candidates for a given threshold
-  const minC = Math.max(1, Math.round(s.minContact * fs / 1000)), minF = Math.round(s.minFlight * fs / 1000);
+  const minC = Math.max(1, Math.round(s.minContact * fs)), minF = Math.round(s.minFlight * fs);
   const toC = thr => {
     const c = [];
     for (let i = q.end + minC; i < n; i++) if (F[i] < thr && F[i - 1] >= thr) {
@@ -358,94 +430,113 @@ function analyseTrial(raw, fs, condition, bwN, skips, s) {
   m.thrTO = thrTO; m.thrLD = thrLD;
   out.cand.takeoff = to;
   if (!to.length) { flags.push('No take-off detected (no flight phase)'); return out; }
-  const iTO = to[Math.min(skips.takeoff, to.length - 1)];
+  const iTO = pick(to, skips.takeoff);
   ev.takeoff = iTO;
 
-  // onset candidates
+  // onset candidates, restricted to before the unweighting minimum
   const thr = Math.max(s.onsetSD * q.sd, s.onsetMinN);
   m.onsetThr = thr;
   const isOut = v => s.onsetDir === 'either' ? Math.abs(v - Wons) > thr : v < Wons - thr;
-  // onset must precede the unweighting minimum before the main propulsive peak
   let gPk = q.end; for (let i = q.end; i < iTO; i++) if (F[i] > F[gPk]) gPk = i;
   let gMin = q.end; for (let i = q.end; i <= gPk; i++) if (F[i] < F[gMin]) gMin = i;
   const on = [];
   for (let i = q.end; i <= gMin; i++) if (isOut(F[i]) && (i === q.end || !isOut(F[i - 1]))) on.push(i);
   out.cand.onset = on;
   if (!on.length) { flags.push('No movement onset detected'); return out; }
-  const iCross = on[Math.min(skips.onset, on.length - 1)];
-  const iOn = Math.max(q.end, iCross - Math.round(s.onsetBack * fs / 1000));
+  const iOn = Math.max(q.end, pick(on, skips.onset) - Math.round(s.onsetBack * fs));
   ev.onset = iOn;
   if (skips.onset) flags.push(`Onset skipped x${skips.onset}`);
   if (skips.takeoff) flags.push(`Take-off skipped x${skips.takeoff}`);
 
   // phases
+  const w = Math.max(1, Math.round(s.slopeWin * fs));
   let iPk = iOn; for (let i = iOn; i < iTO; i++) if (F[i] > F[iPk]) iPk = i;
   let iMin = iOn; for (let i = iOn; i <= iPk; i++) if (F[i] < F[iMin]) iMin = i;
   ev.min = iMin; ev.peak = iPk;
   m.minForce = F[iMin]; m.peakForce = F[iPk];
-  m.tOnsetPeak = ms(iPk - iOn);
-  m.peakRFDecrease = slopeExtreme(F, iOn, iMin, Math.round(s.slopeWin * fs / 1000), fs, false);
-  m.peakRFD = slopeExtreme(F, iMin, iPk, Math.round(s.slopeWin * fs / 1000), fs, true);
-  m.avgRFD = iPk > iMin ? (F[iPk] - F[iMin]) / ((iPk - iMin) * dt) : null;
+  m.tOnsetPeak = sec(iPk - iOn);
+  m.peakRFDecrease = slopeExtreme(F, iOn, iMin, w, fs, false);
+  m.peakRFD = slopeExtreme(F, iMin, iPk, w, fs, true);
 
-  let iHump = null;
-  if (F[iMin] < Wref) { for (let i = iMin; i <= iPk; i++) if (F[i] >= Wref) { iHump = i; break; } }
+  let iAct = null;
+  if (F[iMin] < Wref) { for (let i = iMin; i <= iPk; i++) if (F[i] >= Wref) { iAct = i; break; } }
   else flags.push('Force did not fall below reference weight before the peak - no unweighting phase');
-  let iLate = null;
-  for (let i = iTO; i > iPk; i--) if (F[i] < Wref && F[i - 1] >= Wref) { iLate = i; break; }
+  let iDec = null;
+  for (let i = iTO; i > iPk; i--) if (F[i] < Wref && F[i - 1] >= Wref) { iDec = i; break; }
   if (F[iPk] < Wref) flags.push('Force never exceeded reference weight');
-  if (iHump !== null) {
-    ev.hump = iHump;
-    m.unwDur = ms(iHump - iOn);
-    m.unwImp = trapz(F, iOn, iHump, Wref, dt);
+  const aStart = s.avgRFDDef === 'activePeak' ? iAct : iMin;
+  m.avgRFD = aStart != null && iPk > aStart ? (F[iPk] - F[aStart]) * fs / (iPk - aStart) : null;
+  if (iAct !== null) {
+    ev.active = iAct;
+    m.unwDur = sec(iAct - iOn);
+    m.unwImp = integ(F, iOn, iAct, Wref, dt, s.intMethod);
   }
-  if (iLate !== null) {
-    ev.late = iLate;
-    m.preDur = ms(iTO - iLate);
-    m.preImp = trapz(F, iLate, iTO, Wref, dt);
-    if (iHump !== null && iLate > iHump) {
-      m.humpDur = ms(iLate - iHump);
-      m.humpImp = trapz(F, iHump, iLate, Wref, dt);
-      let sum = 0; for (let i = iHump; i <= iLate; i++) sum += F[i];
-      m.humpMean = sum / (iLate - iHump + 1);
-      let dips = 0; for (let i = iHump + 1; i < iLate; i++) if (F[i] < Wref && F[i - 1] >= Wref) dips++;
-      if (dips) flags.push(`Force dipped below reference ${dips}x within the above-weight phase`);
+  if (iDec !== null) {
+    ev.decel = iDec;
+    m.decDur = sec(iTO - iDec);
+    m.decImp = integ(F, iDec, iTO, Wref, dt, s.intMethod);
+    if (iAct !== null && iDec > iAct) {
+      m.actDur = sec(iDec - iAct);
+      m.actImp = integ(F, iAct, iDec, Wref, dt, s.intMethod);
+      let sum = 0; for (let i = iAct; i <= iDec; i++) sum += F[i];
+      m.actMean = sum / (iDec - iAct + 1);
+      let dips = 0; for (let i = iAct + 1; i < iDec; i++) if (F[i] < Wref && F[i - 1] >= Wref) dips++;
+      if (dips) flags.push(`Force dipped below reference ${dips}x within the active phase`);
     }
   }
-  m.ttt = ms(iTO - iOn);
+  m.ttt = sec(iTO - iOn);
 
   // landing
   const land = ldC(iTO, thrLD);
   out.cand.landing = land;
-  if (!land.length) { flags.push('No landing detected (recording ends in flight)'); return out; }
-  const iLd = land[Math.min(skips.landing, land.length - 1)];
-  if (skips.landing) flags.push(`Landing skipped x${skips.landing}`);
-  ev.landing = iLd;
-  m.flight = ms(iLd - iTO);
-  m.ftTtt = m.flight / m.ttt;
-  const wEnd = Math.min(n - 1, iLd + Math.round(s.landWin * fs / 1000));
-  let iLp = iLd; for (let i = iLd; i <= wEnd; i++) if (F[i] > F[iLp]) iLp = i;
-  ev.landPeak = iLp;
-  m.landPeak = F[iLp];
-  m.landTime = ms(iLp - iLd);
-  m.loadRate = iLp > iLd ? (F[iLp] - F[iLd]) / ((iLp - iLd) * dt) : null;
-  if (iLp === wEnd) flags.push(wEnd === n - 1 ? 'Landing peak at end of recording' : 'Landing peak at end of search window');
-  const post = ms(n - 1 - iLd);
-  if (post < s.postLandFlag) flags.push(`Recording ends ${Math.round(post)} ms after landing`);
+  if (!land.length) flags.push('No landing detected (recording ends in flight)');
+  else {
+    const iLd = pick(land, skips.landing);
+    if (skips.landing) flags.push(`Landing skipped x${skips.landing}`);
+    ev.landing = iLd;
+    m.flight = sec(iLd - iTO);
+    m.ftTtt = m.flight / m.ttt;
+    const wEnd = Math.min(n - 1, iLd + Math.round(s.landWin * fs));
+    let iLp = iLd; for (let i = iLd; i <= wEnd; i++) if (F[i] > F[iLp]) iLp = i;
+    ev.landPeak = iLp;
+    m.landPeak = F[iLp];
+    m.landTime = sec(iLp - iLd);
+    m.loadRate = iLp > iLd ? (F[iLp] - F[iLd]) * fs / (iLp - iLd) : null;
+    if (iLp === wEnd) flags.push(wEnd === n - 1 ? 'Landing peak at end of recording' : 'Landing peak at end of search window');
+    const post = sec(n - 1 - iLd);
+    if (post < s.postLandFlag) flags.push(`Recording ends ${post.toFixed(3)} s after landing`);
+  }
+  (s.custom || []).forEach((c, i) => { m['c' + i] = customMetric(F, fs, ev, c, Wref, s); });
   return out;
 }
 
+// [key, label, kind, decimals]; kind sets units and whether relative values are reported
 const METRICS = [
-  ['flightMean', 'Flight-phase mean force (N)', 2], ['flightSD', 'Flight-phase SD (N)', 2], ['thrTO', 'Take-off threshold used (N)', 2], ['thrLD', 'Landing threshold used (N)', 2],
-  ['standing', 'Standing weight (N)', 1], ['quietSD', 'Quiet stance SD (N)', 2], ['bandOffset', 'Band offset (N)', 1], ['refWeight', 'Reference weight (N)', 1],
-  ['unwDur', 'Unweighting duration (ms)', 0], ['unwImp', 'Unweighting impulse (N.s)', 2], ['minForce', 'Minimum force (N)', 1], ['peakRFDecrease', 'Peak rate of force decrease (N/s)', 0],
-  ['humpDur', 'Above-weight duration (ms)', 0], ['humpImp', 'Above-weight impulse (N.s)', 2], ['humpMean', 'Above-weight mean force (N)', 1],
-  ['peakForce', 'Peak force (N)', 1], ['peakRFD', 'Peak RFD (N/s)', 0], ['avgRFD', 'Average RFD min-peak (N/s)', 0], ['tOnsetPeak', 'Onset to peak force (ms)', 0],
-  ['preDur', 'Pre-take-off below-weight duration (ms)', 0], ['preImp', 'Pre-take-off below-weight impulse (N.s)', 2],
-  ['ttt', 'Time to take-off (ms)', 0], ['flight', 'Flight time (ms)', 0], ['ftTtt', 'Flight time : time to take-off', 3],
-  ['landPeak', 'Peak landing force (N)', 1], ['landTime', 'Landing to peak force (ms)', 0], ['loadRate', 'Average loading rate (N/s)', 0]
+  ['standing', 'Standing weight', 'force', 1], ['bandOffset', 'Band offset', 'force', 1], ['refWeight', 'Reference weight', 'force', 1],
+  ['quietSD', 'Quiet stance SD', 'info', 2], ['thrTO', 'Take-off threshold used', 'info', 2], ['thrLD', 'Landing threshold used', 'info', 2],
+  ['flightMean', 'Flight-phase mean force', 'info', 2], ['flightSD', 'Flight-phase SD', 'info', 2],
+  ['unwDur', 'Unweighting phase duration', 'time', 3], ['unwImp', 'Unweighting phase impulse', 'impulse', 2], ['minForce', 'Minimum force', 'force', 1], ['peakRFDecrease', 'Peak rate of force decrease', 'rate', 0],
+  ['actDur', 'Active phase duration', 'time', 3], ['actImp', 'Active phase impulse', 'impulse', 2], ['actMean', 'Active phase mean force', 'force', 1],
+  ['peakForce', 'Peak force', 'force', 1], ['peakRFD', 'Peak RFD', 'rate', 0], ['avgRFD', 'Average RFD', 'rate', 0], ['tOnsetPeak', 'Onset to peak force', 'time', 3],
+  ['decDur', 'Pre-take-off deceleration phase duration', 'time', 3], ['decImp', 'Pre-take-off deceleration phase impulse', 'impulse', 2],
+  ['ttt', 'Time to take-off', 'time', 3], ['flight', 'Flight time', 'time', 3], ['ftTtt', 'Flight time : time to take-off', 'ratio', 3],
+  ['landPeak', 'Peak landing force', 'force', 1], ['landTime', 'Landing to peak force', 'time', 3], ['loadRate', 'Average loading rate', 'rate', 0]
 ];
-const REL = { minForce: 1, peakForce: 1, humpMean: 1, landPeak: 1, unwImp: 1, humpImp: 1, preImp: 1 };
+const UNITS = { force: ['N', 'N/kg', 'BW'], impulse: ['N·s', 'N·s/kg', 'BW·s'], rate: ['N/s', 'N/s/kg', 'BW/s'], time: ['s'], ratio: [''], info: ['N'] };
+const RELDP = { force: [2, 3], impulse: [3, 4], rate: [1, 2] };
+const DPKIND = { force: 1, impulse: 2, rate: 0, time: 3, ratio: 3, info: 2 };
+
+function metricList(s) {
+  return METRICS.concat((s.custom || []).map((c, i) => ['c' + i, c.name, (STATS[c.stat] || [])[1] || 'info', DPKIND[(STATS[c.stat] || [])[1]] ?? 2]));
+}
+// value of metric k in form which (0 absolute, 1 per kg body mass, 2 per body weight)
+function metricValue(m, k, kind, which, bwN, g) {
+  const v = m[k];
+  if (v == null || isNaN(v)) return null;
+  if (!which) return v;
+  if (!RELDP[kind] || !bwN) return null;
+  return which === 1 ? v / (bwN / g) : v / bwN;
+}
 
 // Winter's residual analysis: residual RMS vs cut-off, line fitted to the noise region
 function residualAnalysis(x, fs, s) {
@@ -463,7 +554,7 @@ function residualAnalysis(x, fs, s) {
   return { fc, R, a, b, cutoff: k >= 0 ? fc[k] : null };
 }
 
-if (typeof module !== 'undefined') module.exports = { VERSION, DEFAULTS, parseKinvent, analyseTrial, lowpass, residualAnalysis, METRICS, REL };
+if (typeof module !== 'undefined') module.exports = { VERSION, DEFAULTS, EVENTS, STATS, parseKinvent, analyseTrial, lowpass, residualAnalysis, integ, METRICS, UNITS, RELDP, metricList, metricValue };
 
 </script>
 <script>
@@ -473,29 +564,27 @@ const SET_FIELDS = [
     ['phaseRef', 'Phase reference', 'sel', [['trial', 'Trial standing weight'], ['normal', 'Body weight (normal trial)']], 'Weight used to split the phases and calculate impulses (force above or below it).'],
     ['onsetRef', 'Onset reference', 'sel', [['trial', 'Trial standing weight'], ['normal', 'Body weight (normal trial)']], 'Weight the onset threshold is measured from. The SD always comes from the trial\'s own quiet stance.']]],
   ['Quiet stance', [
-    ['quietLen', 'Window length (ms)', 'num', null, 'The steadiest window of this length (lowest SD) is used.'],
-    ['quietSearch', 'Window must end by (ms)', 'num', null, 'Search limit from the start of the recording.'],
+    ['quietLen', 'Window length (s)', 'num', null, 'The steadiest window of this length (lowest SD) is used.'],
+    ['quietSearch', 'Window must end by (s)', 'num', null, 'Search limit from the start of the recording.'],
     ['sdFlag', 'Flag SD above (N)', 'num']]],
   ['Movement onset', [
     ['onsetSD', 'Threshold (x SD)', 'num', null, 'Onset = force leaves the quiet-stance mean by this many SDs.'],
     ['onsetMinN', 'Minimum threshold (N)', 'num', null, 'Floor on the threshold for very quiet recordings. 0 = off.'],
     ['onsetDir', 'Direction', 'sel', [['below', 'Below weight only'], ['either', 'Above or below']]],
-    ['onsetBack', 'Step back from crossing (ms)', 'num']]],
+    ['onsetBack', 'Step back from crossing (s)', 'num']]],
   ['Take-off and landing', [
     ['eventMode', 'Threshold method', 'sel', [['fixed', 'Fixed thresholds (below)'], ['flight', 'Flight-phase noise (mean + k SD)']], 'Flight-phase option: the unloaded plate signal in the middle of each flight sets that trial\'s take-off and landing threshold. Falls back to the fixed values if no landing is found.'],
     ['takeoffN', 'Fixed take-off threshold (N)', 'num'],
     ['landingN', 'Fixed landing threshold (N)', 'num'],
     ['flightK', 'Flight-phase threshold (x SD)', 'num'],
     ['flightMid', 'Central portion of flight used (%)', 'num', null, 'Flight-phase mean and SD are reported for every trial whichever method is selected.'],
-    ['minFlight', 'Minimum flight time (ms)', 'num', null, 'Landing is only searched for after this.'],
-    ['minContact', 'Contact must persist (ms)', 'num', null, 'Force must stay above the threshold this long before take-off and after landing, so flight-phase noise is ignored.'],
-    ['landWin', 'Landing peak window (ms)', 'num', null, 'Peak landing force is the maximum within this window after landing.'],
-    ['postLandFlag', 'Flag if recording ends within (ms) of landing', 'num']]],
-  ['Rate of force change', [
-    ['slopeWin', 'Window (ms)', 'num', null, 'RFD = change in force over this window, slid sample by sample. Peak RFD is searched from minimum to peak force; peak rate of decrease from onset to minimum force.']]],
+    ['minFlight', 'Minimum flight time (s)', 'num', null, 'Landing is only searched for after this.'],
+    ['minContact', 'Contact must persist (s)', 'num', null, 'Force must stay above the threshold this long before take-off and after landing, so flight-phase noise is ignored.'],
+    ['postLandFlag', 'Flag if recording ends within (s) of landing', 'num']]],
   ['Filtering', [
-    ['filterOn', 'Low-pass filter', 'sel', [['false', 'Off (raw data)'], ['true', 'On']], '2nd-order Butterworth, run forwards and backwards (zero lag).'],
+    ['filterOn', 'Low-pass filter', 'sel', [['false', 'Off (raw data)'], ['true', '4th-order zero-lag Butterworth']], '2nd-order Butterworth applied forwards and backwards, giving a 4th-order response with no phase lag.'],
     ['filterHz', 'Cut-off (Hz)', 'num'],
+    ['filterCorrect', 'Correct cut-off for dual pass', 'sel', [['false', 'No'], ['true', 'Yes (Winter)']], 'A dual pass lowers the -3 dB point to about 80% of the stated cut-off. With correction, the design frequency is divided by 0.802 so the filter attenuates at the stated cut-off.'],
     ['resMin', 'Residual analysis: lowest cut-off (Hz)', 'num'],
     ['resMax', 'Residual analysis: highest cut-off (Hz)', 'num'],
     ['resStep', 'Residual analysis: step (Hz)', 'num'],
@@ -503,7 +592,15 @@ const SET_FIELDS = [
     ['resFitHi', 'Noise region fit to (Hz)', 'num', null, 'Winter\'s residual analysis: a line is fitted to the residual in the noise region, and the suggested cut-off is where the residual curve meets its intercept.']]],
   ['Constants', [['g', 'Gravity (m/s²)', 'num']]]
 ];
-const LS = 'bandcmj-settings-v1';
+const CALC_FIELDS = [
+  ['Calculation methods', [
+    ['intMethod', 'Integration method for impulses', 'sel', [['trapz', 'Trapezoidal rule'], ['rect', 'Rectangle rule'], ['simpson', 'Simpson\'s rule']], 'Used for every impulse, including custom metrics. Impulse is the area between force and the reference weight.'],
+    ['avgRFDDef', 'Average RFD', 'sel', [['minPeak', 'Minimum force to peak force'], ['activePeak', 'Start of active phase to peak force']]],
+    ['slopeWin', 'RFD window (s)', 'num', null, 'Rate of force change is the change in force over this window, slid sample by sample. Peak RFD is searched from minimum to peak force, and peak rate of force decrease from onset to minimum force.'],
+    ['landWin', 'Landing peak window (s)', 'num', null, 'Peak landing force is the maximum within this window after landing.']]]
+];
+const ALL_FIELDS = () => SET_FIELDS.concat(CALC_FIELDS);
+const LS = 'fta-settings-v2';
 let S = loadSettings();
 let files = [], fid = 0, sel = null, results = [];
 const tState = {};
@@ -624,9 +721,9 @@ function renderTrial() {
   const sh = [], tt = j => j / fs;
   const band = (a, b, c) => { if (a != null && b != null && b > a) sh.push({ type: 'rect', xref: 'x', yref: 'paper', x0: tt(a), x1: tt(b), y0: 0, y1: 1, fillcolor: c, line: { width: 0 }, layer: 'below' }); };
   if (r.quiet) band(r.quiet.start, r.quiet.end, 'rgba(120,120,115,.18)');
-  band(ev.onset, ev.hump, 'rgba(42,120,214,.2)');
-  band(ev.hump, ev.late, 'rgba(235,104,52,.2)');
-  band(ev.late, ev.takeoff, 'rgba(237,161,0,.28)');
+  band(ev.onset, ev.active, 'rgba(42,120,214,.2)');
+  band(ev.active, ev.decel, 'rgba(235,104,52,.2)');
+  band(ev.decel, ev.takeoff, 'rgba(237,161,0,.28)');
   band(ev.takeoff, ev.landing, 'rgba(160,160,155,.22)');
   band(ev.landing, ev.landPeak, 'rgba(27,175,122,.22)');
   const hl = (y, dash, c) => { if (y != null) sh.push({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y, line: { color: c, width: 1.2, dash } }); };
@@ -651,7 +748,7 @@ function renderTrial() {
 
   const evBox = (e, label) => {
     const c = r.cand[e] || [], s = st.skips[e];
-    const time = ev[e] != null ? `${(ev[e] * 1000 / fs).toFixed(0)} ms` : 'not found';
+    const time = ev[e] != null ? `${(ev[e] / fs).toFixed(3)} s` : 'not found';
     return `<div class="ev"><b>${label}</b><div class="t">${time} &middot; candidate ${c.length ? Math.min(s, c.length - 1) + 1 : 0} of ${c.length}${s ? ` &middot; skipped ${s}x` : ''}</div>
       <button data-e="${e}" data-d="-1" ${s ? '' : 'disabled'}>&larr; Back</button>
       <button data-e="${e}" data-d="1" ${s < c.length - 1 ? '' : 'disabled'}>Skip to next &rarr;</button></div>`;
@@ -660,35 +757,42 @@ function renderTrial() {
   $('#events').querySelectorAll('button').forEach(b => b.onclick = () => { st.skips[b.dataset.e] = Math.max(0, st.skips[b.dataset.e] + +b.dataset.d); refresh(); });
   $('#flags').innerHTML = r.flags.map(fl => `<span class="flag ${/^No |not (below|above)|never|did not/.test(fl) ? 'bad' : ''}">${fl}</span>`).join('');
 
-  const m = r.m, bm = x.bw ? x.bw / S.g : null, rel = (v, d) => bm && v != null ? ` <span class="muted">(${(v / bm).toFixed(d)}/kg)</span>` : '';
-  const groups = [['Weights', ['standing', 'quietSD', 'bandOffset', 'refWeight']], ['Event detection', ['thrTO', 'thrLD', 'flightMean', 'flightSD']], ['Unweighting', ['unwDur', 'unwImp', 'minForce', 'peakRFDecrease']],
-    ['Above weight', ['humpDur', 'humpImp', 'humpMean', 'peakForce', 'peakRFD', 'avgRFD', 'tOnsetPeak']], ['Pre-take-off', ['preDur', 'preImp']],
-    ['Whole jump', ['ttt', 'flight', 'ftTtt']], ['Landing', ['landPeak', 'landTime', 'loadRate']]];
-  const md = Object.fromEntries(METRICS.map(([k, l, d]) => [k, [l, d]]));
-  $('#metrics').innerHTML = groups.map(([g, ks]) => `<h4>${g}</h4>` + ks.map(kk => `<div><span>${md[kk][0]}</span><span>${fmt(m[kk], md[kk][1])}${REL[kk] ? rel(m[kk], /Imp/.test(kk) ? 3 : 2) : ''}</span></div>`).join('')).join('') +
-    `<h4>Body mass</h4><div><span>Body mass from normal trials (kg)</span><span>${bm ? bm.toFixed(1) : ''}</span></div>`;
+  const m = r.m, ml = Object.fromEntries(metricList(S).map(e => [e[0], e]));
+  const groups = [['Weights', ['standing', 'bandOffset', 'refWeight', 'quietSD']], ['Event detection', ['thrTO', 'thrLD', 'flightMean', 'flightSD']],
+    ['Unweighting phase', ['unwDur', 'unwImp', 'minForce', 'peakRFDecrease']], ['Active phase', ['actDur', 'actImp', 'actMean', 'peakForce', 'peakRFD', 'avgRFD', 'tOnsetPeak']],
+    ['Pre-take-off deceleration phase', ['decDur', 'decImp']], ['Whole jump', ['ttt', 'flight', 'ftTtt']], ['Landing loading phase', ['landPeak', 'landTime', 'loadRate']]];
+  if ((S.custom || []).length) groups.push(['Custom metrics', S.custom.map((_, i) => 'c' + i)]);
+  const cell = (kk, which) => {
+    const [, , kind, dp] = ml[kk], v = metricValue(m, kk, kind, which, x.bw, S.g);
+    if (v == null) return '';
+    const d = which ? RELDP[kind][which - 1] : dp, u = UNITS[kind][which];
+    return `${v.toFixed(d)}${u ? `<span class="u">${u}</span>` : ''}`;
+  };
+  $('#metrics').innerHTML = `<table class="mtab"><thead><tr><th>Metric</th><th class="num">Absolute</th><th class="num">Relative to body mass</th><th class="num">Relative to body weight</th></tr></thead><tbody>` +
+    groups.map(([g, ks]) => `<tr class="g"><td colspan="4">${g}</td></tr>` + ks.map(kk => `<tr><td>${ml[kk][1]}</td><td class="v">${cell(kk, 0)}</td><td class="v">${cell(kk, 1)}</td><td class="v">${cell(kk, 2)}</td></tr>`).join('')).join('') +
+    `<tr class="g"><td colspan="4">Participant</td></tr><tr><td>Body weight / body mass (normal trials)</td><td class="v">${x.bw ? `${x.bw.toFixed(1)}<span class="u">N</span>` : ''}</td><td class="v">${x.bw ? `${(x.bw / S.g).toFixed(2)}<span class="u">kg</span>` : ''}</td><td></td></tr></tbody></table>`;
 }
 
 function rows(hideExcl) {
-  const md = METRICS, settings = Object.entries(S).map(([a, b]) => `${a}=${b}`).join('; ');
-  const head = ['Participant', 'Condition', 'File', 'Trial', 'Excluded', 'Body mass (kg)', ...md.map(m => m[1]),
-    ...md.filter(m => REL[m[0]]).map(m => m[1].replace(/\((N|N\.s)\)/, '($1/kg)')), 'Onset skips', 'Take-off skips', 'Landing skips', 'Flags', 'App version', 'Settings'];
+  const ml = metricList(S), settings = JSON.stringify(S), cols = [];
+  ml.forEach(([k, l, kind, dp]) => UNITS[kind].forEach((u, w) => { if (w === 0 || RELDP[kind]) cols.push([k, kind, w, w ? RELDP[kind][w - 1] : dp, u ? `${l} (${u})` : l]); }));
+  const head = ['Participant', 'Condition', 'File', 'Trial', 'Excluded', 'Body mass (kg)', 'Body weight (N)', ...cols.map(c => c[4]), 'Onset skips', 'Take-off skips', 'Landing skips', 'Flags', 'App version', 'Settings'];
   const body = results.filter(x => !(hideExcl && x.st.excluded)).map(x => {
-    const m = x.r.m, bm = x.bw ? x.bw / S.g : null;
-    return [x.f.participant, x.f.condition, x.f.name, 'T' + (x.k + 1), x.st.excluded ? 'Yes' : 'No', fmt(bm, 2), ...md.map(([k, , d]) => fmt(m[k], d)),
-      ...md.filter(mm => REL[mm[0]]).map(([k]) => bm && m[k] != null ? (m[k] / bm).toFixed(3) : ''),
+    const m = x.r.m;
+    return [x.f.participant, x.f.condition, x.f.name, 'T' + (x.k + 1), x.st.excluded ? 'Yes' : 'No', fmt(x.bw ? x.bw / S.g : null, 2), fmt(x.bw, 1),
+      ...cols.map(([k, kind, w, d]) => fmt(metricValue(m, k, kind, w, x.bw, S.g), d)),
       x.st.skips.onset, x.st.skips.takeoff, x.st.skips.landing, x.r.flags.join(' | '), VERSION, settings];
   });
-  return { head, body, n: md.length };
+  return { head, body };
 }
 function renderResults() {
   const { head, body } = rows($('#hideExcl').checked), shown = head.length - 2;
-  $('#results thead').innerHTML = '<tr>' + head.slice(0, shown).map((h, j) => `<th class="${j > 5 && j < shown - 4 ? 'num' : ''}">${h}</th>`).join('') + '</tr>';
+  $('#results thead').innerHTML = '<tr>' + head.slice(0, shown).map((h, j) => `<th class="${j > 4 && j < shown - 4 ? 'num' : ''}">${h}</th>`).join('') + '</tr>';
   const vis = results.filter(x => !($('#hideExcl').checked && x.st.excluded));
-  $('#results tbody').innerHTML = body.map((r, i) => `<tr class="${vis[i].st.excluded ? 'excl' : ''}" data-i="${results.indexOf(vis[i])}">` + r.slice(0, shown).map((v, j) => `<td class="${j > 5 && j < shown - 4 ? 'num' : ''}">${j === shown - 1 && v ? String(v).split(' | ').map(fl => `<span class="flag">${fl}</span>`).join('') : v}</td>`).join('') + '</tr>').join('');
+  $('#results tbody').innerHTML = body.map((r, i) => `<tr class="${vis[i].st.excluded ? 'excl' : ''}" data-i="${results.indexOf(vis[i])}">` + r.slice(0, shown).map((v, j) => `<td class="${j > 4 && j < shown - 4 ? 'num' : ''}">${j === shown - 1 && v ? String(v).split(' | ').map(fl => `<span class="flag">${fl}</span>`).join('') : v}</td>`).join('') + '</tr>').join('');
   $('#results tbody').querySelectorAll('tr').forEach(tr => tr.onclick = () => { const x = results[+tr.dataset.i]; sel = { f: x.f.id, k: x.k }; renderList(); renderTrial(); document.querySelector('.viewer').scrollIntoView({ behavior: 'smooth' }); });
 }
-const csvText = () => { const { head, body } = rows($('#hideExcl').checked); const q = v => /[",\n;]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v; return [head, ...body].map(r => r.map(q).join(',')).join('\r\n'); };
+const csvText = () => { const { head, body } = rows($('#hideExcl').checked); const q = v => /[",\n;]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v; return '\ufeff' + [head, ...body].map(r => r.map(q).join(',')).join('\r\n'); };
 let dlNs = null;
 try { if (window.claude && claude.use) claude.use('downloads').then(n => { dlNs = n; }).catch(() => {}); } catch (e) {}
 async function download(name, text, type) {
@@ -705,14 +809,35 @@ async function copy(text) {
   catch (e) { const b = $('#copyBox'); b.style.display = 'block'; b.value = text; b.select(); toast('Select all and copy from the box below'); }
 }
 
+let draftCustom = [];
+const fieldHtml = ([g, fl]) => `<fieldset><legend>${g}</legend>` + fl.map(([k, l, ty, opt, hint]) =>
+  `<div class="set"><label for="s_${k}">${l}</label>${ty === 'sel' ? `<select id="s_${k}">${opt.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>` : `<input id="s_${k}" type="number" step="any">`}${hint ? `<small>${hint}</small>` : ''}</div>`).join('') + '</fieldset>';
 function buildSettings() {
-  $('#setForm').innerHTML = SET_FIELDS.map(([g, fl]) => `<fieldset><legend>${g}</legend>` + fl.map(([k, l, ty, opt, hint]) =>
-    `<div class="set"><label for="s_${k}">${l}</label>${ty === 'sel' ? `<select id="s_${k}">${opt.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>` : `<input id="s_${k}" type="number" step="any">`}${hint ? `<small>${hint}</small>` : ''}</div>`).join('') + '</fieldset>').join('');
+  $('#setForm').innerHTML = SET_FIELDS.map(fieldHtml).join('');
+  $('#calcForm').innerHTML = CALC_FIELDS.map(fieldHtml).join('');
 }
-function fillSettings(src) { SET_FIELDS.forEach(([, fl]) => fl.forEach(([k]) => { $('#s_' + k).value = String(src[k]); })); }
+function renderCustom() {
+  const opt = (o, v) => Object.entries(o).map(([k, l]) => `<option value="${k}"${k === v ? ' selected' : ''}>${Array.isArray(l) ? l[0] : l}</option>`).join('');
+  const tb = $('#customTable tbody');
+  tb.innerHTML = draftCustom.length ? '' : '<tr><td colspan="7" class="muted">No custom metrics yet.</td></tr>';
+  draftCustom.forEach((c, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input type="text" data-f="name" value="${(c.name || '').replace(/"/g, '&quot;')}" placeholder="Name"></td><td><select data-f="stat">${opt(STATS, c.stat)}</select></td>
+      <td><select data-f="from">${opt(EVENTS, c.from)}</select></td><td><input type="number" step="any" data-f="fromOff" value="${c.fromOff || 0}" style="width:80px"></td>
+      <td><select data-f="to">${opt(EVENTS, c.to)}</select></td><td><input type="number" step="any" data-f="toOff" value="${c.toOff || 0}" style="width:80px"></td><td><button title="Remove">&times;</button></td>`;
+    tr.querySelectorAll('[data-f]').forEach(el => el.onchange = () => { const f = el.dataset.f; c[f] = /Off$/.test(f) ? +el.value : el.value; });
+    tr.querySelector('button').onclick = () => { draftCustom.splice(i, 1); renderCustom(); };
+    tb.appendChild(tr);
+  });
+}
+function fillSettings(src) {
+  ALL_FIELDS().forEach(([, fl]) => fl.forEach(([k]) => { $('#s_' + k).value = String(src[k]); }));
+  draftCustom = JSON.parse(JSON.stringify(src.custom || [])); renderCustom();
+}
 function readSettings() {
   const o = {};
-  SET_FIELDS.forEach(([, fl]) => fl.forEach(([k, , ty]) => { const v = $('#s_' + k).value; o[k] = ty === 'num' ? +v : v === 'true' ? true : v === 'false' ? false : v; }));
+  ALL_FIELDS().forEach(([, fl]) => fl.forEach(([k, , ty]) => { const v = $('#s_' + k).value; o[k] = ty === 'num' ? +v : v === 'true' ? true : v === 'false' ? false : v; }));
+  o.custom = draftCustom.map((c, i) => ({ name: (c.name || '').trim() || `Custom metric ${i + 1}`, stat: c.stat, from: c.from, fromOff: +c.fromOff || 0, to: c.to, toOff: +c.toOff || 0 }));
   return o;
 }
 function applySettings(o) {
@@ -755,12 +880,17 @@ $('#runRes').onclick = () => {
 $('#useRes').onclick = () => { if (resSuggest != null) { $('#s_filterHz').value = resSuggest; $('#s_filterOn').value = 'true'; toast('Cut-off filled in - press Apply to use it'); } };
 buildSettings();
 $('#openSettings').onclick = () => { fillSettings(S); $('#setJson').value = ''; $('#modal').classList.add('open'); };
+$('#addCustom').onclick = () => { draftCustom.push({ name: '', stat: 'impRef', from: 'onset', fromOff: 0, to: 'onset', toOff: 0.1 }); renderCustom(); };
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  ['det', 'calc', 'io'].forEach(k => { $('#tab-' + k).hidden = k !== b.dataset.tab; });
+});
 $('#closeSettings').onclick = () => $('#modal').classList.remove('open');
 $('#modal').onclick = e => { if (e.target.id === 'modal') $('#modal').classList.remove('open'); };
 $('#applySet').onclick = () => { if (applySettings(readSettings())) { $('#modal').classList.remove('open'); toast('Settings applied'); } };
 $('#resetSet').onclick = () => fillSettings(DEFAULTS);
 $('#copySet').onclick = () => copy(JSON.stringify(readSettings(), null, 1));
-$('#loadSet').onclick = () => { try { fillSettings({ ...DEFAULTS, ...JSON.parse($('#setJson').value) }); toast('Loaded - press Apply'); } catch (e) { toast('Could not read that JSON'); } };
+$('#loadSet').onclick = () => { try { const j = JSON.parse($('#setJson').value); fillSettings({ ...DEFAULTS, ...(j.settings || j) }); toast('Loaded - press Apply'); } catch (e) { toast('Could not read that JSON'); } };
 $('#pickFiles').onclick = () => $('#fileIn').click();
 $('#pickFolder').onclick = () => $('#folderIn').click();
 $('#fileIn').onchange = e => { addFiles([...e.target.files], false); e.target.value = ''; };
