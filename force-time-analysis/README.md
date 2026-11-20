@@ -1,6 +1,6 @@
 # Force-Time Analysis
 
-Browser-based analysis of force platform data for normal, band-assisted and band-resisted countermovement jumps (CMJs).
+Browser-based analysis of force platform data for normal, band-assisted and band-resisted countermovement jumps (CMJs) and squat jumps (SJs).
 
 Developed by Dr Tommy Bright ([ORCID 0000-0001-8089-817X](https://orcid.org/0000-0001-8089-817X), [ResearchGate](https://www.researchgate.net/profile/Thomas-Bright-4)).
 
@@ -10,7 +10,7 @@ Developed by Dr Tommy Bright ([ORCID 0000-0001-8089-817X](https://orcid.org/0000
 
 Open `force-time-analysis.html` in any modern browser. No installation or internet connection is needed, and data are processed locally and never uploaded.
 
-1. Load the raw Kinvent CSV exports (files or a whole folder). Participant and condition are read from the file name and can be edited.
+1. Load the raw Kinvent CSV exports (files or a whole folder). Participant, jump type (CMJ or SJ) and condition are read from the file name and can be edited.
 2. Load each participant's normal (body weight) trials, which are used for body weight and body mass.
 3. Inspect each trial. Movement onset, take-off and landing can be moved to the next detected candidate if the first is a false detection. No events can be placed by hand.
 4. Export the results as CSV. Every row records the software version, the full settings used (including custom metrics) and any skipped events.
@@ -19,10 +19,12 @@ Open `force-time-analysis.html` in any modern browser. No installation or intern
 
 Phases are defined from the ground reaction force relative to a reference weight (by default the trial's own standing weight, optionally body weight from the normal trials):
 
-- **Unweighting phase**: movement onset until force returns to the reference weight
-- **Active phase**: force above the reference weight
+- **Unweighting phase** (CMJ only): movement onset until force returns to the reference weight
+- **Active phase**: force above the reference weight (in SJs, from movement onset)
 - **Pre-take-off deceleration phase**: force back below the reference weight until take-off
 - **Landing loading phase**: landing to peak landing force
+
+CMJ onset is detected when force falls below the quiet-stance mean, and SJ onset when force rises above it from the squat hold. Squat jumps are flagged if force dips below weight before the push (a countermovement).
 
 In a normal CMJ with a system-weight reference, the active phase spans the braking phase and the propulsion phase up to peak upward velocity, and the pre-take-off deceleration phase is the remainder of the propulsion phase (McMahon et al., 2018).
 
