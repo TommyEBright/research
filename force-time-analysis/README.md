@@ -24,7 +24,9 @@ Phases are defined from the ground reaction force relative to a reference weight
 - **Pre-take-off deceleration phase**: force back below the reference weight until take-off
 - **Landing loading phase**: landing to peak landing force
 
-CMJ onset is detected when force falls below the quiet-stance mean, and SJ onset when force rises above it from the squat hold. Squat jumps are flagged if force dips below weight before the push (a countermovement).
+CMJ onset is detected when force falls below the quiet-stance mean.
+
+For squat jumps, the recording starts in the squat hold. Onset is the start of the straight-up push, namely the last time force rises above the squat hold before peak force, so small movements during the hold are ignored. Any drop in force below the squat hold before the push is reported as countermovement depth, and the trial is flagged when it exceeds the set threshold. By default the SJ standing weight (and so the phase reference) comes from the steadiest window of quiet standing after landing, because with bands the force in the squat hold differs from standing.
 
 In a normal CMJ with a system-weight reference, the active phase spans the braking phase and the propulsion phase up to peak upward velocity, and the pre-take-off deceleration phase is the remainder of the propulsion phase (McMahon et al., 2018).
 

@@ -149,7 +149,7 @@ footer{max-width:1500px;margin:0 auto;padding:0 24px 30px;font-size:12px;color:v
         <label><input type="checkbox" id="exclude"> Exclude trial</label>
       </div>
       <div class="legend">
-        <span><i style="background:rgba(120,120,115,.18)"></i>Quiet stance</span>
+        <span><i style="background:rgba(120,120,115,.18)"></i>Quiet stance / squat hold / end standing</span>
         <span><i style="background:rgba(42,120,214,.2)"></i>Unweighting phase</span>
         <span><i style="background:rgba(235,104,52,.2)"></i>Active phase</span>
         <span><i style="background:rgba(237,161,0,.28)"></i>Pre-take-off deceleration phase</span>
@@ -219,7 +219,7 @@ footer{max-width:1500px;margin:0 auto;padding:0 24px 30px;font-size:12px;color:v
 
 <script>
 // Force-Time Analysis - analysis core (no DOM). Times in seconds, forces in newtons. Jump types: 'CMJ', 'SJ'.
-const VERSION = '1.3.0';
+const VERSION = '1.3.1';
 
 const DEFAULTS = {
   phaseRef: 'trial',      // 'trial' = trial's own standing weight, 'normal' = body weight from normal trial
@@ -232,7 +232,9 @@ const DEFAULTS = {
   onsetDir: 'below',      // 'below' or 'either'
   onsetBack: 0.03,        // s, step back from threshold crossing
   sjOnsetSD: 5,           // squat jump onset threshold, multiples of quiet stance SD above weight
-  sjDipSD: 5,             // squat jump countermovement flag, multiples of quiet stance SD below weight
+  sjDipSD: 5,             // squat jump countermovement flag, multiples of squat hold SD below hold force
+  sjRef: 'end',           // squat jump standing weight: 'end' = quiet standing after landing, 'hold' = squat hold
+  sjEndLen: 1,            // s, length of the quiet standing window after landing
   eventMode: 'fixed',     // 'fixed' thresholds or 'flight' = flight-phase mean + k SD
   takeoffN: 20,           // N
   landingN: 20,           // N
@@ -319,9 +321,14 @@ function lowpass(x, fc, fs) {
 
 
 function quietStance(F, fs, s) {
-  const len = Math.round(s.quietLen * fs), lim = Math.round(s.quietSearch * fs), step = Math.max(1, Math.round(fs / 100));
+  const len = Math.round(s.quietLen * fs), lim = Math.round(s.quietSearch * fs);
+  return quietWindow(F, 0, Math.max(lim, len), len, fs);
+}
+// steadiest (lowest SD) window of length len starting at or after a and ending by b
+function quietWindow(F, a0, b, len, fs) {
+  const step = Math.max(1, Math.round(fs / 100));
   let best = null;
-  for (let a = 0; a + len <= Math.max(lim, len) && a + len <= F.length; a += step) {
+  for (let a = a0; a + len <= b && a + len <= F.length; a += step) {
     let m = 0; for (let i = a; i < a + len; i++) m += F[i]; m /= len;
     let v = 0; for (let i = a; i < a + len; i++) v += (F[i] - m) ** 2;
     const sd = Math.sqrt(v / (len - 1));
@@ -382,17 +389,20 @@ function analyseTrial(raw, fs, condition, bwN, skips, s, jump) {
   const q = quietStance(F, fs, s);
   const out = { F, flags, ev, m, quiet: q, cand: {} };
   if (!q) { flags.push('Recording too short for quiet stance window'); return out; }
-  m.standing = q.mean; m.quietSD = q.sd;
-  if (q.sd > s.sdFlag) flags.push(`Noisy quiet stance (SD ${q.sd.toFixed(1)} N)`);
-  if (bwN) {
-    m.bandOffset = q.mean - bwN;
-    if (condition === 'Assisted' && q.mean >= bwN) flags.push('Standing force not below body weight - check condition label');
-    if (condition === 'Resisted' && q.mean <= bwN) flags.push('Standing force not above body weight - check condition label');
-  }
-  const Wref = s.phaseRef === 'normal' && bwN ? bwN : q.mean;
+  m.quietSD = q.sd;
+  if (q.sd > s.sdFlag) flags.push(`Noisy ${jump === 'SJ' ? 'squat hold' : 'quiet stance'} (SD ${q.sd.toFixed(1)} N)`);
+  const weights = W => {
+    m.standing = W;
+    if (bwN) {
+      m.bandOffset = W - bwN;
+      if (condition === 'Assisted' && W >= bwN) flags.push('Standing force not below body weight - check condition label');
+      if (condition === 'Resisted' && W <= bwN) flags.push('Standing force not above body weight - check condition label');
+    }
+  };
+  if (jump === 'SJ') { m.holdForce = q.mean; m.standing = q.mean; } else weights(q.mean);
+  let Wref = s.phaseRef === 'normal' && bwN ? bwN : q.mean;
   if (s.phaseRef === 'normal' && !bwN) flags.push('No normal trial for participant - phases use trial standing weight');
   const Wons = s.onsetRef === 'normal' && bwN ? bwN : q.mean;
-  m.refWeight = Wref;
 
   // take-off and landing candidates for a given threshold
   const minC = Math.max(1, Math.round(s.minContact * fs)), minF = Math.round(s.minFlight * fs);
@@ -434,6 +444,20 @@ function analyseTrial(raw, fs, condition, bwN, skips, s, jump) {
   if (!to.length) { flags.push('No take-off detected (no flight phase)'); return out; }
   const iTO = pick(to, skips.takeoff);
   ev.takeoff = iTO;
+  if (jump === 'SJ') {
+    let W = q.mean;
+    if (s.sjRef === 'end') {
+      const l = ldC(iTO, thrLD), from = l.length ? Math.min(n, pick(l, skips.landing) + Math.round(s.landWin * fs)) : n;
+      const e = quietWindow(F, from, n, Math.round(s.sjEndLen * fs), fs);
+      if (e) {
+        W = e.mean; out.quietEnd = e; m.endSD = e.sd;
+        if (e.sd > s.sdFlag) flags.push(`Noisy quiet standing after landing (SD ${e.sd.toFixed(1)} N)`);
+      } else flags.push('No quiet standing after landing - squat hold used as standing weight');
+    }
+    weights(W);
+    if (!(s.phaseRef === 'normal' && bwN)) Wref = W;
+  }
+  m.refWeight = Wref;
 
   const w = Math.max(1, Math.round(s.slopeWin * fs));
   let gPk = q.end; for (let i = q.end; i < iTO; i++) if (F[i] > F[gPk]) gPk = i;
@@ -444,6 +468,7 @@ function analyseTrial(raw, fs, condition, bwN, skips, s, jump) {
     m.onsetThr = thr;
     const on = [];
     for (let i = q.end; i <= gPk; i++) if (F[i] > Wons + thr && (i === q.end || F[i - 1] <= Wons + thr)) on.push(i);
+    on.reverse(); // latest crossing before the peak first = start of the straight-up push
     out.cand.onset = on;
     if (!on.length) { flags.push('No movement onset detected'); return out; }
     const iCross = pick(on, skips.onset);
@@ -451,9 +476,13 @@ function analyseTrial(raw, fs, condition, bwN, skips, s, jump) {
     // countermovement check between quiet stance and the start of the push
     let dip = Infinity; for (let i = q.end; i <= iCross; i++) if (F[i] < dip) dip = F[i];
     const dipLim = Math.max(s.sjDipSD * q.sd, s.onsetMinN);
-    if (Wons - dip > dipLim) flags.push(`Countermovement before push-off (force fell ${(Wons - dip).toFixed(0)} N below weight)`);
+    m.sjDip = Math.max(0, q.mean - dip);
+    if (q.mean - dip > dipLim) flags.push(`Countermovement before push-off (force fell ${(q.mean - dip).toFixed(0)} N below squat hold)`);
     iPk = iOn; for (let i = iOn; i < iTO; i++) if (F[i] > F[iPk]) iPk = i;
-    iAct = iOn; dipFrom = iCross;
+    // active phase = force above the reference weight, from the start of the push
+    for (let i = iCross; i <= iPk; i++) if (F[i] >= Wref) { iAct = i; break; }
+    if (iAct !== null && iAct - iOn < Math.round(s.onsetBack * fs)) iAct = iOn;
+    dipFrom = iAct ?? iCross;
     ev.peak = iPk; m.peakForce = F[iPk];
     m.tOnsetPeak = sec(iPk - iOn);
     m.peakRFD = slopeExtreme(F, iOn, iPk, w, fs, true);
@@ -535,7 +564,8 @@ function analyseTrial(raw, fs, condition, bwN, skips, s, jump) {
 // [key, label, kind, decimals]; kind sets units and whether relative values are reported
 const METRICS = [
   ['standing', 'Standing weight', 'force', 1], ['bandOffset', 'Band offset', 'force', 1], ['refWeight', 'Reference weight', 'force', 1],
-  ['quietSD', 'Quiet stance SD', 'info', 2], ['thrTO', 'Take-off threshold used', 'info', 2], ['thrLD', 'Landing threshold used', 'info', 2],
+  ['holdForce', 'Squat hold force', 'force', 1], ['sjDip', 'Countermovement depth before push', 'force', 1], ['endSD', 'Quiet standing SD after landing', 'info', 2],
+  ['quietSD', 'Quiet stance / squat hold SD', 'info', 2], ['thrTO', 'Take-off threshold used', 'info', 2], ['thrLD', 'Landing threshold used', 'info', 2],
   ['flightMean', 'Flight-phase mean force', 'info', 2], ['flightSD', 'Flight-phase SD', 'info', 2],
   ['unwDur', 'Unweighting phase duration', 'time', 3], ['unwImp', 'Unweighting phase impulse', 'impulse', 2], ['minForce', 'Minimum force', 'force', 1], ['peakRFDecrease', 'Peak rate of force decrease', 'rate', 0],
   ['actDur', 'Active phase duration', 'time', 3], ['actImp', 'Active phase impulse', 'impulse', 2], ['actMean', 'Active phase mean force', 'force', 1],
@@ -592,10 +622,13 @@ const SET_FIELDS = [
   ['Movement onset', [
     ['onsetSD', 'CMJ threshold (x SD)', 'num', null, 'CMJ onset = force falls below the quiet-stance mean by this many SDs.'],
     ['onsetDir', 'CMJ direction', 'sel', [['below', 'Below weight only'], ['either', 'Above or below']]],
-    ['sjOnsetSD', 'SJ threshold (x SD)', 'num', null, 'SJ onset = force rises above the quiet-stance mean by this many SDs.'],
-    ['sjDipSD', 'SJ countermovement flag (x SD)', 'num', null, 'An SJ is flagged if force falls this many SDs below the quiet-stance mean before the push.'],
     ['onsetMinN', 'Minimum threshold (N)', 'num', null, 'Floor on all onset and countermovement thresholds for very quiet recordings. 0 = off.'],
     ['onsetBack', 'Step back from crossing (s)', 'num']]],
+  ['Squat jumps', [
+    ['sjRef', 'Standing weight from', 'sel', [['end', 'Quiet standing after landing'], ['hold', 'Squat hold before the push']], 'With bands, force in the squat hold differs from standing because the band is stretched differently, so quiet standing after landing gives the true system weight.'],
+    ['sjEndLen', 'Quiet standing window after landing (s)', 'num', null, 'The steadiest window of this length after the landing peak window is used.'],
+    ['sjOnsetSD', 'Onset threshold (x SD of squat hold)', 'num', null, 'Onset is the start of the straight-up push, namely the last time force rises above the squat hold by this many SDs before peak force. Skip moves to earlier crossings.'],
+    ['sjDipSD', 'Countermovement flag (x SD of squat hold)', 'num', null, 'The drop in force below the squat hold before the push is always reported as countermovement depth, and the trial is flagged when it exceeds this many SDs.']]],
   ['Take-off and landing', [
     ['eventMode', 'Threshold method', 'sel', [['fixed', 'Fixed thresholds (below)'], ['flight', 'Flight-phase noise (mean + k SD)']], 'Flight-phase option: the unloaded plate signal in the middle of each flight sets that trial\'s take-off and landing threshold. Falls back to the fixed values if no landing is found.'],
     ['takeoffN', 'Fixed take-off threshold (N)', 'num'],
@@ -716,7 +749,7 @@ function renderParts(bw, stand) {
   }
 }
 
-const sev = r => r.flags.some(x => /^No |not (below|above)|never|did not|Countermovement/.test(x)) ? 'b' : r.flags.length ? 'w' : '';
+const sev = r => r.flags.some(x => /^No |not (below|above)|never|did not/.test(x)) ? 'b' : r.flags.length ? 'w' : '';
 function renderList() {
   const el = $('#trialList');
   if (!results.length) { el.innerHTML = '<span class="muted">No trials loaded.</span>'; return; }
@@ -749,7 +782,8 @@ function renderTrial() {
   const sh = [], tt = j => j / fs;
   const band = (a, b, c) => { if (a != null && b != null && b > a) sh.push({ type: 'rect', xref: 'x', yref: 'paper', x0: tt(a), x1: tt(b), y0: 0, y1: 1, fillcolor: c, line: { width: 0 }, layer: 'below' }); };
   if (r.quiet) band(r.quiet.start, r.quiet.end, 'rgba(120,120,115,.18)');
-  band(ev.onset, ev.active, 'rgba(42,120,214,.2)');
+  if (r.quietEnd) band(r.quietEnd.start, r.quietEnd.end, 'rgba(120,120,115,.18)');
+  if (f.jump !== 'SJ') band(ev.onset, ev.active, 'rgba(42,120,214,.2)');
   band(ev.active, ev.decel, 'rgba(235,104,52,.2)');
   band(ev.decel, ev.takeoff, 'rgba(237,161,0,.28)');
   band(ev.takeoff, ev.landing, 'rgba(160,160,155,.22)');
@@ -783,10 +817,11 @@ function renderTrial() {
   };
   $('#events').innerHTML = evBox('onset', 'Movement onset') + evBox('takeoff', 'Take-off') + evBox('landing', 'Landing');
   $('#events').querySelectorAll('button').forEach(b => b.onclick = () => { st.skips[b.dataset.e] = Math.max(0, st.skips[b.dataset.e] + +b.dataset.d); refresh(); });
-  $('#flags').innerHTML = r.flags.map(fl => `<span class="flag ${/^No |not (below|above)|never|did not|Countermovement/.test(fl) ? 'bad' : ''}">${fl}</span>`).join('');
+  $('#flags').innerHTML = r.flags.map(fl => `<span class="flag ${/^No |not (below|above)|never|did not/.test(fl) ? 'bad' : ''}">${fl}</span>`).join('');
 
   const m = r.m, ml = Object.fromEntries(metricList(S).map(e => [e[0], e]));
-  const groups = [['Weights', ['standing', 'bandOffset', 'refWeight', 'quietSD']], ['Event detection', ['thrTO', 'thrLD', 'flightMean', 'flightSD']],
+  const groups = [...(f.jump === 'SJ' ? [['Weights', ['standing', 'bandOffset', 'refWeight', 'endSD']], ['Squat hold', ['holdForce', 'quietSD', 'sjDip']]] : [['Weights', ['standing', 'bandOffset', 'refWeight', 'quietSD']]]),
+    ['Event detection', ['thrTO', 'thrLD', 'flightMean', 'flightSD']],
     ...(f.jump === 'SJ' ? [] : [['Unweighting phase', ['unwDur', 'unwImp', 'minForce', 'peakRFDecrease']]]), ['Active phase', ['actDur', 'actImp', 'actMean', 'peakForce', 'peakRFD', 'avgRFD', 'tOnsetPeak']],
     ['Pre-take-off deceleration phase', ['decDur', 'decImp']], ['Whole jump', ['ttt', 'flight', 'ftTtt']], ['Landing loading phase', ['landPeak', 'landTime', 'loadRate']]];
   if ((S.custom || []).length) groups.push(['Custom metrics', S.custom.map((_, i) => 'c' + i)]);
