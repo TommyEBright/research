@@ -12,7 +12,7 @@ Open `force-time-analysis.html` in any modern browser. No installation or intern
 
 1. Load the raw Kinvent CSV exports (files or a whole folder). Participant, jump type (CMJ or SJ) and condition are read from the file name and can be edited.
 2. Load each participant's normal (body weight) trials, which are used for body weight and body mass.
-3. Inspect each trial. Movement onset, take-off and landing can be moved to the next detected candidate if the first is a false detection. No events can be placed by hand.
+3. Inspect each trial. The plot shows the onset threshold band (quiet stance or squat hold mean ± k SD), the exact threshold crossing and the take-off/landing threshold, with zoom views for onset, take-off and landing. Movement onset, take-off and landing can be moved to the next detected candidate if the first is a false detection. No events can be placed by hand.
 4. Export the results as CSV. Every row records the software version, the full settings used (including custom metrics) and any skipped events.
 
 ## Phases

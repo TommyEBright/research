@@ -7,6 +7,6 @@ All tools run in the browser. Data are processed locally and never uploaded.
 
 | Tool | Description | Version |
 |---|---|---|
-| [Force-Time Analysis](https://tommyebright.github.io/research/force-time-analysis/force-time-analysis.html) | Force platform analysis of normal, band-assisted and band-resisted countermovement and squat jumps ([details](force-time-analysis/)) | 1.3.1 |
+| [Force-Time Analysis](https://tommyebright.github.io/research/force-time-analysis/force-time-analysis.html) | Force platform analysis of normal, band-assisted and band-resisted countermovement and squat jumps ([details](force-time-analysis/)) | 1.4.0 |
 
 Each tool has its own folder with a README and a `CITATION.cff`. Please cite the specific tool you use.
